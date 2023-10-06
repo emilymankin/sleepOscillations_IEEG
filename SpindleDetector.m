@@ -129,6 +129,13 @@ classdef SpindleDetector < handle
                 end
             end
             
+            if sum(isnan(data))/length(data) > 0.85
+                % too much data is either noise or non-sleep, so just
+                % declare this a channel without spindles and move on.
+                isVerified = 0;
+                return
+            end
+            
             %divide the data to segments and calculate power spectrum and
             %fit for each segment
             
@@ -265,7 +272,7 @@ classdef SpindleDetector < handle
             bandpassSignal(NaNInds) = 0;
             bandpassRejection(NaNInds) = 0;
             
-            %calculate the envelops
+            %calculate the envelope
             envelope = abs(hilbert(bandpassSignal));
             envelopeRejection = abs(hilbert(bandpassRejection));
             envelope(NaNInds) = NaN;
@@ -316,6 +323,12 @@ classdef SpindleDetector < handle
                 nextInd = find(pointsPassedThresh(endCurrEvent+1:end),1,'first')+endCurrEvent;
             end
             
+            if isempty(spindleEventsMinLimit)
+                spindleTimes = [];
+                spindleStats = []; 
+                startEndTimes = [];
+                return
+            end
             %merge events which are too close apart, and set the spindle
             %timing to be the middle of the event
             eventDiffs = spindleEventsMinLimit(2:end)-spindleEventsMaxLimit(1:end-1);
@@ -366,7 +379,7 @@ classdef SpindleDetector < handle
                     %current sleep stage
                     if ~isempty(sleepScoring)
                         %this supports sleep stages in milliseconds
-                        currSleepStages = sleepStages(currStartTime:currEndTime);
+                        currSleepStages = sleepScoring(currStartTime:currEndTime);
                         uss = unique(sleepScoring);
                         histStages = hist(currSleepStages,uss);
                         histStages = histStages./sum(histStages);
@@ -395,6 +408,10 @@ classdef SpindleDetector < handle
             % verified as a channel with robust spindle activity
             
             nSpindles = length(spindleTimes);
+            if nSpindles == 0
+                isVerified = 0;
+                return
+            end
             
             %find segments of spindles and control segments of non-spindle
             %near the spindle
@@ -406,7 +423,15 @@ classdef SpindleDetector < handle
             
             for iSpindle = 1:nSpindles
                 %data in and around the spindle
-                currSpindleData = data(spindleTimes(iSpindle)-round(timeWindow/2):spindleTimes(iSpindle)+round(timeWindow/2)-1);
+                currSpindleData = data(max(spindleTimes(iSpindle)-round(timeWindow/2),1):min(spindleTimes(iSpindle)+round(timeWindow/2)-1,length(data)));
+                if spindleTimes(iSpindle)-round(timeWindow/2) < 1
+                    toPad = 1-spindleTimes(iSpindle)-round(timeWindow/2);
+                    currSpindleData = [nan(1,toPad) currSpindleData];
+                end
+                if spindleTimes(iSpindle)+round(timeWindow/2)-1 > length(data)
+                    toPad = spindleTimes(iSpindle)+round(timeWindow/2)-1 - length(data);
+                    currSpindleData = [currSpindleData nan(1,toPad)];
+                end
                 spindlesPS = [spindlesPS; obj.getPS(currSpindleData)];
                 
                 

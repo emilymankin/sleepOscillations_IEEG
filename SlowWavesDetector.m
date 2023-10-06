@@ -2,7 +2,7 @@ classdef SlowWavesDetector < handle
     
     properties
         
-        samplingRate = 1000;
+        samplingRate;
         
         lowLimitPhase = 0.16;
         highLimitPhase = 1.25;
@@ -42,7 +42,7 @@ classdef SlowWavesDetector < handle
     
     methods
         
-        function [slowWavesTimes, slowWavesPeaks] = findSlowWaves(obj, data, sleepScoring, IIStimes)
+        function [slowWavesTimes, slowWavesPeaks,obj] = findSlowWaves(obj, data, sleepScoring, IIStimes,justGetThresh)
             
             %The method detects slow waves in the data based on their
             %maximal amplitude and duration.
@@ -68,6 +68,10 @@ classdef SlowWavesDetector < handle
             removeIIS = true;
             if nargin < 4 || isempty(IIStimes)
                 removeIIS = false;
+            end
+            
+            if nargin < 5
+                justGetThresh = 0;
             end
             
             %filter the data at the slow waves frequency band
@@ -139,11 +143,13 @@ classdef SlowWavesDetector < handle
             %find a threshold - at the percentileForSlowAmpOutlier
             %percentile
             if isnan(obj.thresholdAmplitude) && ~obj.usePredefinedThresholdAmplitude
-                cyclesPassedAmpThresh = maxAmpSlowPerCycle>=prctile(maxAmpSlowPerCycle,100-obj.percentileForAmplitude);
+                obj.thresholdAmplitude = prctile(maxAmpSlowPerCycle,100-obj.percentileForAmplitude);
+                cyclesPassedAmpThresh = maxAmpSlowPerCycle >= obj.thresholdAmplitude;
             else
                 %if there is an absolute predefined threshold, use
                 %the predefined threshold
                 if obj.usePredefinedThresholdAmplitude
+                    obj.thresholdAmplitude = obj.predefinedThreshForAmp;
                     currThresh = obj.predefinedThreshForAmp;
                 else
                     %if the threshold is not predefined but was calculated
@@ -152,6 +158,11 @@ classdef SlowWavesDetector < handle
                     currThresh = obj.thresholdAmplitude;
                 end
                 cyclesPassedAmpThresh = maxAmpSlowPerCycle >= currThresh;
+            end
+            if justGetThresh
+                slowWavesTimes = [];
+                slowWavesPeaks = [];
+                return
             end
             
             cyclesPassedLengthThresh = lsCycles >= obj.minLengthThresh & lsCycles <= obj.maxLengthThresh;
