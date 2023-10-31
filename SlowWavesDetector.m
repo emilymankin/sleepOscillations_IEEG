@@ -245,6 +245,7 @@ classdef SlowWavesDetector < handle
             %find zero crossings of the filtered data
             zci = @(v) find(v(:).*circshift(v(:), [-1 0]) <= 0);
             zeroCross = zci(dataFiltered);
+            zeroCross(zeroCross==1) = [];
             
             %candidates can be from a positive to negative change until
             %negative to positive to change or the other way around
