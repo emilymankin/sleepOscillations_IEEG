@@ -183,6 +183,9 @@ classdef SpindleDetector < handle
             meanFS = nanmean(fitSpectrums, 1);
             
             spindleRangeInds = find(freq>=obj.spindleRangeMin & freq<=obj.spindleRangeMax);
+            if isempty(spindleRangeInds)
+                isVerified = false;
+            else
             [~,maxInd] = max(meanPS(spindleRangeInds)-meanFS(spindleRangeInds));
             maxInd = spindleRangeInds(maxInd);
             
@@ -196,6 +199,7 @@ classdef SpindleDetector < handle
                 isVerified = true;
             else
                 isVerified = false;
+            end
             end
         end
         
