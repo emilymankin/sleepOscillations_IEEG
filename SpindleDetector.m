@@ -178,6 +178,14 @@ classdef SpindleDetector < handle
                 fitSpectrums = [fitSpectrums; y'];
             end
             
+            if isempty(powerSpectrums)
+                % this means there were too many NaNs in ALL of the
+                % segments above. We will assume this channel is not
+                % verified.
+                isVerified = false;
+                return;
+            end
+            
             %find the point of maximal difference inside the spindle range
             meanPS = nanmean(powerSpectrums,1);
             meanFS = nanmean(fitSpectrums, 1);
