@@ -160,7 +160,8 @@ classdef SpindleDetector < handle
                 currSegment = data((iSeg-1)*segLength+1:iSeg*segLength);
                 %if there are nans - we assume it means this is not a sleep
                 %segment
-                if sum(isnan(currSegment))/length(currSegment)>obj.nanThresh
+                if sum(isnan(currSegment))/length(currSegment)>obj.nanThresh || ...
+                    max(diff(currSegment))==0
                     continue;
                 end
                 psdx = obj.getPS(currSegment);
@@ -432,19 +433,26 @@ classdef SpindleDetector < handle
             timeWindow = obj.timeWindowAroundSpindle*obj.samplingRate;
             %calculate the range in which control segments can selected
             rng = obj.maxDistControlSpindle-obj.minDistControlSpindle-obj.timeWindowAroundSpindle;
+            winPre = ceil(timeWindow/2); winPost = floor(timeWindow/2);
+            toAddToTime = -winPre:winPost;
+            spindleDataTemplate = nan(size(toAddToTime));
             
             for iSpindle = 1:nSpindles
                 %data in and around the spindle
-                currSpindleData = data(max(spindleTimes(iSpindle)-round(timeWindow/2),1):min(spindleTimes(iSpindle)+round(timeWindow/2)-1,length(data)));
-                if spindleTimes(iSpindle)-round(timeWindow/2) < 1
-                    toPad = 1-spindleTimes(iSpindle)-round(timeWindow/2);
-                    currSpindleData = [nan(1,toPad) currSpindleData];
-                end
-                if spindleTimes(iSpindle)+round(timeWindow/2)-1 > length(data)
-                    toPad = spindleTimes(iSpindle)+round(timeWindow/2)-1 - length(data);
-                    currSpindleData = [currSpindleData nan(1,toPad)];
-                end
-                spindlesPS = [spindlesPS; obj.getPS(currSpindleData)];
+                currSpindleInds = spindleTimes(iSpindle)+toAddToTime;
+                goodInds = currSpindleInds>0 & currSpindleInds <= length(data);
+                currSpindleData = spindleDataTemplate; 
+                currSpindleData(goodInds) = data(currSpindleInds(goodInds));
+%                 if spindleTimes(iSpindle)-round(timeWindow/2) < 1
+%                     toPad = 1-spindleTimes(iSpindle)-round(timeWindow/2);
+%                     currSpindleData = [nan(1,toPad) currSpindleData];
+%                 end
+%                 if spindleTimes(iSpindle)+round(timeWindow/2)-1 > length(data)
+%                     toPad = spindleTimes(iSpindle)+round(timeWindow/2)-1 - length(data);
+%                     currSpindleData = [currSpindleData nan(1,toPad)];
+%                 end
+                newSpPS = obj.getPS(currSpindleData);
+                spindlesPS = [spindlesPS; newSpPS];
                 
                 
                 for iControl = 1:obj.controlsPerSpindle
@@ -780,7 +788,9 @@ classdef SpindleDetector < handle
         
         function psdx = getPS(obj,segment)
             %an help method to calcualte the power spectrum of a segment
-            
+            if mod(length(segment),2)
+                segment(end) = [];
+            end
             segLength = length(segment);
             xdft = fft(segment);
             xdft = xdft(1:segLength/2+1);
